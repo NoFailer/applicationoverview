@@ -673,13 +673,15 @@ function application_misc()
         output_page($page);
     }
 
+   // Dieser Code stammt aus dem Steckbriefplugin von risuana und wurde für diesen Plugin stellenweise angepasst.
+
     // Antwortpost für WoB erstellen
     if ($mybb->input['action'] == 'wob') {
         // Alle informationen ziehen
         $wobtext = $mybb->settings['app_wobtext'];
         $author = $mybb->input['uid'];
         $usergroup = $mybb->input['usergroup'];
-        $subject = "RE: {$mybb->input['subject']}";
+        $subject = "{$mybb->input['subject']}";
         $username = $db->escape_string($mybb->user['username']);
         $posttid = $mybb->input['tid'];
         $fid = $mybb->input['fid'];
@@ -705,7 +707,7 @@ function application_misc()
             "tid" => $posttid,
             "replyto" => $posttid,
             "fid" => $fid,
-            "subject" => $db->escape_string($subject),
+            "subject" => "RE: ".$db->escape_string($subject),
             "icon" => "0",
             "uid" => $uid,
             "username" => $db->escape_string($username),
@@ -724,12 +726,21 @@ function application_misc()
         // Letzten Post im Forum updaten (für Annahme)
         $new_record = array(
             "lastpost" => TIME_NOW,
-            "lastposter" => $username,
+            "lastposter" => $db->escape_string($username),
             "lastposteruid" => $uid,
-            "lastposttid" => $posttid
+            "lastposttid" => $posttid,
+            "lastpostsubject" => $db->escape_string($subject)
         );
-        // $insert_array = $db->update_query("forums", $new_record, "fid = '$fid'");
+	    
         $db->update_query("forums", $new_record, "fid = '$fid'");
+
+        $new_record = array(
+            "lastpost" => TIME_NOW,
+            "lastposter" => $db->escape_string($username),
+            "lastposteruid" => $uid,
+
+        );
+        $db->update_query("threads", $new_record, "tid = '$posttid'");
 
         $db->delete_query("applications", "uid = {$author}");
         redirect("showthread.php?tid={$posttid}");
