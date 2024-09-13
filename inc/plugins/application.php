@@ -22,7 +22,7 @@ function application_info()
     return array(
         "name" => "Bewerberverwaltung",
         "description" => "In diesem Plugin kannst du zum einen die Bewerberchecklist verwalten, ihnen die Möglichkeit, sich selbst zu verlängern und ihnen im Postbit über ein Dropdown annehmen.",
-        "website" => "",
+        "website" => "https://github.com/Ales12/applicationoverview",
         "author" => "Ales",
         "authorsite" => "https://github.com/Ales12",
         "version" => "1.0",
