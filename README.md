@@ -1,5 +1,5 @@
 # Bewerberübersicht
-Mit diesem Plugin können deine Bewerber ihre Bewerbung selbstständig verlängern, bekommen eine Alert, wenn ihre Bewerbung vom Team übernommen wurde und bekomm eine Checkliste angezeigt, welche Profilfelder sie alles ausfüllen können. Es ist zudem möglich, sowohl Primäre, als auch sekundäre Usergruppen auszuwählen. Zudem wird das Datum des WoBs im Profil ausgelesen.
+Mit diesem Plugin können deine Bewerber ihre Bewerbung selbstständig verlängern, bekommen eine Alert, wenn ihre Bewerbung vom Team übernommen wurde und bekommen eine Checkliste angezeigt, mit den Profilfelder, welche sie alle ausfüllen sollen. Es ist zudem möglich, sowohl Primäre, als auch sekundäre Usergruppen auszuwählen. Zudem wird das Datum des WoBs im Profil ausgelesen.
 
 ## DB Einträge
 neue Tabelle: applications<br />
