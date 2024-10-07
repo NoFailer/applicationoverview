@@ -22,7 +22,7 @@ function application_info()
     return array(
         "name" => "Bewerberverwaltung",
         "description" => "In diesem Plugin kannst du zum einen die Bewerberchecklist verwalten, ihnen die Möglichkeit, sich selbst zu verlängern und ihnen im Postbit über ein Dropdown annehmen.",
-        "website" => "https://github.com/Ales12/applicationoverview",
+        "website" => "",
         "author" => "Ales",
         "authorsite" => "https://github.com/Ales12",
         "version" => "1.0",
@@ -41,7 +41,7 @@ function application_install()
             `app_id` int(10) NOT NULL auto_increment,
             `uid` int(10) NOT NULL,
             `regdate` int(10) NOT NULL,
-            `appdeadline` date,
+            `appdeadline` int(10) NOT NULL,
             `appdays` int(10) NOT NULL,
             `appcount` int(10) NOT NULL,
             `corrector` int(10) NOT NULL,
@@ -382,7 +382,7 @@ function application_uninstall()
     $db->delete_query('settings', "name IN ('app_maindays','app_renewcount','app_renewdays','app_alert','app_appforum', 'app_groups', 'app_userfid', 'app_checklist', 'app_wobtext')");
     $db->delete_query('settinggroups', "name = 'application'");
 
-    
+
     $db->delete_query("templates", "title LIKE '%application%'");
 
     require_once MYBB_ADMIN_DIR . "inc/functions_themes.php";
@@ -583,8 +583,8 @@ function application_misc()
             $charaname = $chara = build_profile_link($row['username'], $row['uid']);
 
             $charaname = $charaname . $extend;
-            $deadline = $row['appdeadline'];
             $regdate = $row['regdate'];
+            $deadline = $row['appdeadline'];
             $faktor = 86400;
             if ($extendcount != 0) {
                 $extenddays = $row['appdays'] * $faktor;
@@ -673,8 +673,6 @@ function application_misc()
         output_page($page);
     }
 
-   // Dieser Code stammt aus dem Steckbriefplugin von risuana und wurde für diesen Plugin stellenweise angepasst.
-
     // Antwortpost für WoB erstellen
     if ($mybb->input['action'] == 'wob') {
         // Alle informationen ziehen
@@ -707,7 +705,7 @@ function application_misc()
             "tid" => $posttid,
             "replyto" => $posttid,
             "fid" => $fid,
-            "subject" => "RE: ".$db->escape_string($subject),
+            "subject" => "RE: " . $db->escape_string($subject),
             "icon" => "0",
             "uid" => $uid,
             "username" => $db->escape_string($username),
@@ -731,7 +729,7 @@ function application_misc()
             "lastposttid" => $posttid,
             "lastpostsubject" => $db->escape_string($subject)
         );
-	    
+        // $insert_array = $db->update_query("forums", $new_record, "fid = '$fid'");
         $db->update_query("forums", $new_record, "fid = '$fid'");
 
         $new_record = array(
@@ -871,7 +869,7 @@ function application_global()
 function getApplication()
 {
     global $db, $mybb;
-    $app_maindays = $mybb->settings['app_maindays'];
+    $app_maindays = intval($mybb->settings['app_maindays']);
 
     /*   Bewerber aus der Datenbank löschen, wenn nicht mehr existent
       Dieser Part stammt aus Sophies Bewerberplugin und wurde für diesen Plugin angepasst. */
@@ -901,10 +899,12 @@ function getApplication()
         ");
 
         while ($row = $db->fetch_array($get_newapp)) {
-            $deadline = new DateTime();
-            $deadline->setTimestamp($row['regdate']);
-            date_add($deadline, date_interval_create_from_date_string($app_maindays . 'days'));
-            $deadline = strtotime($deadline->format('Y-m-d'));
+
+            $faktor = 86400;
+            $today = $row['regdate'];
+            $app_maindays = $app_maindays - 1;
+            $maindays = $app_maindays * $faktor;
+            $deadline = $today + $maindays;
 
 
             $addNewapp = array(
