@@ -144,7 +144,7 @@ function application_install()
     $insert_array = array(
         'title' => 'application_alert',
         'template' => $db->escape_string('<div class="red_alert">
-	<a href="misc.php?action=application_overview">{$lang->app_alert}</a>
+	<a href="misc.php?action=application_overview">{$get_app_alert}</a>
 </div>'),
         'sid' => '-1',
         'version' => '',
@@ -803,7 +803,9 @@ function application_global()
             }
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
             if ($dayscount <= $app_alert && $dayscount > 0) {
-                $lang->app_alert = $lang->sprintf($lang->app_alert, $dayscount);
+                $get_app_alert = $lang->sprintf($lang->app_alert, $dayscount);
+            } else{
+                $get_app_alert = $lang->app_alertdown;
             }
 
             $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = {$uid} and fid = {$appforum}"));
