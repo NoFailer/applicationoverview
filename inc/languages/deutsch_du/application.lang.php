@@ -15,6 +15,8 @@ $l['app_addcorrecteur'] = "+";
 $l['app_correct_text'] = "Korrektur übernehmen";
 $l['app_correcteur'] = "Wird korrigiert von:";
 $l['app_alert'] = "Du hast noch <b>{1}</b> Tage für deine Bewerbung";
+$l['app_alertdown'] = "Deine Bewerbungsfrist ist abgelaufen";
+$l['app_wiw'] = "Sieht sich gerade die Bewerberübersicht an.";
 
 // Checklist
 $l['checklist'] = "Bewerberchecklist";
