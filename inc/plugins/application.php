@@ -16,9 +16,6 @@ if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
 $plugins->add_hook('showthread_start', 'application_showthread');
 // Profil
 $plugins->add_hook('member_profile_end', 'application_member_profile');
-//wer ist wo
-$plugins->add_hook('fetch_wol_activity_end', 'application_user_activity');
-$plugins->add_hook('build_friendly_wol_location_end', 'application_location_activity');
 
 function application_info()
 {
@@ -528,8 +525,8 @@ function application_showthread()
         while ($row = $db->fetch_array($get_groups)) {
             $select_additiongroup .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
         }
-
-        if ($mybb->usergroup['canmodcp'] == 1) {
+        $uid = $db->fetch_field($db->simple_select("applications", "uid", "uid = {$tuid}"), "uid");
+        if ($mybb->usergroup['canmodcp'] == 1 && $tuid == $uid) {
             eval ("\$application_wob .= \"" . $templates->get("application_wob") . "\";");
         }
     }
@@ -579,12 +576,8 @@ function application_misc()
             $uid = $row['uid'];
             $extradays = $row['appdays'];
             $extendcount = $row['appcount'];
-            $as_uid = $row['as_uid'];
-
-            if ($as_uid == $mybb->user['uid'] or $uid = $mybb->user['uid'] or $as_uid == $mybb->user['as_uid']) {
-                if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
-                    $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
-                }
+            if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
+                $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
             }
 
             $charaname = $chara = build_profile_link($row['username'], $row['uid']);
@@ -597,7 +590,6 @@ function application_misc()
                 $extenddays = $row['appdays'] * $faktor;
                 $deadline = $deadline + $extenddays;
             }
-
 
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
             if ($dayscount > 0) {
@@ -765,6 +757,7 @@ function application_global()
     $app_maindays = intval($mybb->settings['app_maindays']);
     $appforum = intval($mybb->settings['app_appforum']);
     $appchecklist = $mybb->settings['app_checklist'];
+
     // Funktion ausführen, bei der neue User hinzugefügt oder gelöscht werden soll
     getApplication();
 
@@ -792,14 +785,12 @@ function application_global()
     while ($app = $db->fetch_array($select)) {
         $application_alert = "";
         $uid = $app['uid'];
-        
         $app_query = $db->query("SELECT *
         FROM " . TABLE_PREFIX . "applications
         where uid = {$uid}
         ");
         $application = $db->fetch_array($app_query);
         if (!empty($application)) {
-        
             $extradays = $application['appdays'];
             $extendcount = $application['appcount'];
             $deadline = $application['appdeadline'];
@@ -810,17 +801,15 @@ function application_global()
                 $deadline = $deadline + $extenddays;
             }
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
-            if ($dayscount > 0) {
+         
+            if ($dayscount <= $app_alert && $dayscount > 0) {
                 $get_app_alert = $lang->sprintf($lang->app_alert, $dayscount);
             } else{
-                $get_app_alert = $lang->app_alertdown;
+                $get_app_alert = (isset($lang->app_alertdown) ? $lang->app_alertdown : false);;
             }
 
             $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = {$uid} and fid = {$appforum}"));
-
-
-
-            if (empty($get_thread) AND $dayscount <= $app_alert) {
+            if (empty($get_thread)) {
                 eval ("\$application_alert = \"" . $templates->get("application_alert") . "\";");
             }
         }
@@ -897,16 +886,6 @@ function getApplication()
         $db->delete_query("applications", "uid = {$deletecharas['uid']}");
     }
 
-    $get_deleteuser_wobuser = $db->query("SELECT uid
-    FROM " . TABLE_PREFIX . "applications 
-    where uid not in (SELECT uid
-    FROM " . TABLE_PREFIX . "users
-    where usergroup = 2)
-    ");
-
-  while ($deletecharas = $db->fetch_array($get_deleteuser_wobuser)) {
-      $db->delete_query("applications", "uid = {$deletecharas['uid']}");
-  }
 
     /*
      * Bewerber in die Datenbank laden. 
@@ -1083,24 +1062,4 @@ function application_member_profile()
         $wob = $lang->app_nowob_profile;
     }
 
-}
-
-function application_user_activity($user_activity)
-{
-    global $user;
-    if (my_strpos($user['location'], "misc.php?action=application") !== false) {
-        $user_activity['activity'] = "application";
-    }
-
-    return $user_activity;
-}
-
-function application_location_activity($plugin_array)
-{
-    global $db, $mybb, $lang;
-    $lang->load('application');
-    if ($plugin_array['user_activity']['activity'] == "application") {
-        $plugin_array['location_name'] = $lang->app_wiw;
-    }
-    return $plugin_array;
 }
