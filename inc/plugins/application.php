@@ -496,7 +496,7 @@ function application_showthread()
         ");
             $select_group = "";
             while ($row = $db->fetch_array($get_groups)) {
-                $select_group .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
+                $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
             }
         } else {
             $allgroups = explode(",", $app_groups);
@@ -505,11 +505,11 @@ function application_showthread()
                 $get_groups = $db->query("SELECT *
             FROM " . TABLE_PREFIX . "usergroups
             WHERE gid = {$group}
-            ORDER BY usertitle ASC
+            ORDER BY title ASC
             ");
                 $row = $db->fetch_array($get_groups);
 
-                $select_group .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
+                $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
             }
 
         }
@@ -523,7 +523,7 @@ function application_showthread()
         ");
         $select_additiongroup = "";
         while ($row = $db->fetch_array($get_groups)) {
-            $select_additiongroup .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
+            $select_additiongroup .= "<option value='{$row['gid']}'>{$row['title']}</option>";
         }
         $uid = $db->fetch_field($db->simple_select("applications", "uid", "uid = {$tuid}"), "uid");
         if ($mybb->usergroup['canmodcp'] == 1 && $tuid == $uid) {
@@ -576,9 +576,12 @@ function application_misc()
             $uid = $row['uid'];
             $extradays = $row['appdays'];
             $extendcount = $row['appcount'];
-            if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
+            if ($row['appcount'] < $app_renewcount && empty($row['corrector']) && $uid == $mybb->user['uid']) {
                 $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
-            }
+            } elseif(empty($row['corrector']) && $mybb->usergroup['canmodcp'] == 1) {
+                $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
+            } 
+
 
             $charaname = $chara = build_profile_link($row['username'], $row['uid']);
 
@@ -678,10 +681,10 @@ function application_misc()
         $wobtext = $mybb->settings['app_wobtext'];
         $author = $mybb->input['uid'];
         $usergroup = $mybb->input['usergroup'];
-        $subject = "{$mybb->input['subject']}";
-        $username = $db->escape_string($mybb->user['username']);
+        $username = $mybb->user['username'];
         $posttid = $mybb->input['tid'];
-        $fid = $mybb->input['fid'];
+        $fid = $mybb->input['fid']; 
+        $subject = $db->fetch_field($db->simple_select("threads", "subject", "tid = {$posttid}"), "subject");
         $uid = $mybb->user['uid'];
         $ownip = $db->fetch_field($db->query("SELECT ip FROM " . TABLE_PREFIX . "sessions WHERE " . TABLE_PREFIX . "sessions.uid = '$uid'"), "ownip");
 
