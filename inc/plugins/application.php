@@ -483,7 +483,9 @@ function application_showthread()
             $charalink = build_profile_link($c_name, $c_user['uid']);
             $correcteur = $lang->sprintf($lang->app_showthread_correct, $charalink);
         } else {
-            $add_correct = "<a href='misc.php?action=application_overview&correct={$tuid}' title='{$lang->app_correct_text}'>{$lang->app_correct_text}</a>";
+            if ($mybb->usergroup['canmodcp'] == 1) {
+                $add_correct = "<a href='misc.php?action=application_overview&correct={$tuid}' title='{$lang->app_correct_text}'>{$lang->app_correct_text}</a>";
+            }
             $correcteur = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no) . " " . $add_correct;
         }
         eval ("\$application_correct = \"" . $templates->get("application_correct") . "\";");
@@ -578,9 +580,9 @@ function application_misc()
             $extendcount = $row['appcount'];
             if ($row['appcount'] < $app_renewcount && empty($row['corrector']) && $uid == $mybb->user['uid']) {
                 $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
-            } elseif(empty($row['corrector']) && $mybb->usergroup['canmodcp'] == 1) {
+            } elseif (empty($row['corrector']) && $mybb->usergroup['canmodcp'] == 1) {
                 $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
-            } 
+            }
 
 
             $charaname = $chara = build_profile_link($row['username'], $row['uid']);
@@ -683,7 +685,7 @@ function application_misc()
         $usergroup = $mybb->input['usergroup'];
         $username = $mybb->user['username'];
         $posttid = $mybb->input['tid'];
-        $fid = $mybb->input['fid']; 
+        $fid = $mybb->input['fid'];
         $subject = $db->fetch_field($db->simple_select("threads", "subject", "tid = {$posttid}"), "subject");
         $uid = $mybb->user['uid'];
         $ownip = $db->fetch_field($db->query("SELECT ip FROM " . TABLE_PREFIX . "sessions WHERE " . TABLE_PREFIX . "sessions.uid = '$uid'"), "ownip");
@@ -741,8 +743,17 @@ function application_misc()
 
         );
         $db->update_query("threads", $new_record, "tid = '$posttid'");
-
         $db->delete_query("applications", "uid = {$author}");
+
+        // Alert auslösen, weil wir wollen ja bescheid wissen, ne?!
+        if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
+            $alertType = MybbStuff_MyAlerts_AlertTypeManager::getInstance()->getByCode('alert_wob');
+            if ($alertType != NULL && $alertType->getEnabled() && $author != $mybb->user['uid']) {
+                $alert = new MybbStuff_MyAlerts_Entity_Alert((int) $author, $alertType);
+                MybbStuff_MyAlerts_AlertManager::getInstance()->addAlert($alert);
+            }
+        }
+
         redirect("showthread.php?tid={$posttid}");
     }
 }
@@ -804,11 +815,12 @@ function application_global()
                 $deadline = $deadline + $extenddays;
             }
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
-         
+
             if ($dayscount <= $app_alert && $dayscount > 0) {
                 $get_app_alert = $lang->sprintf($lang->app_alert, $dayscount);
-            } else{
-                $get_app_alert = (isset($lang->app_alertdown) ? $lang->app_alertdown : false);;
+            } else {
+                $get_app_alert = (isset($lang->app_alertdown) ? $lang->app_alertdown : false);
+                ;
             }
 
             $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = {$uid} and fid = {$appforum}"));
