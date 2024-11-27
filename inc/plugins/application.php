@@ -16,6 +16,9 @@ if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
 $plugins->add_hook('showthread_start', 'application_showthread');
 // Profil
 $plugins->add_hook('member_profile_end', 'application_member_profile');
+//wer ist wo
+$plugins->add_hook('fetch_wol_activity_end', 'application_user_activity');
+$plugins->add_hook('build_friendly_wol_location_end', 'application_location_activity');
 
 function application_info()
 {
@@ -483,9 +486,7 @@ function application_showthread()
             $charalink = build_profile_link($c_name, $c_user['uid']);
             $correcteur = $lang->sprintf($lang->app_showthread_correct, $charalink);
         } else {
-            if ($mybb->usergroup['canmodcp'] == 1) {
-                $add_correct = "<a href='misc.php?action=application_overview&correct={$tuid}' title='{$lang->app_correct_text}'>{$lang->app_correct_text}</a>";
-            }
+            $add_correct = "<a href='misc.php?action=application_overview&correct={$tuid}' title='{$lang->app_correct_text}'>{$lang->app_correct_text}</a>";
             $correcteur = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no) . " " . $add_correct;
         }
         eval ("\$application_correct = \"" . $templates->get("application_correct") . "\";");
@@ -498,7 +499,7 @@ function application_showthread()
         ");
             $select_group = "";
             while ($row = $db->fetch_array($get_groups)) {
-                $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
+                $select_group .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
             }
         } else {
             $allgroups = explode(",", $app_groups);
@@ -507,11 +508,11 @@ function application_showthread()
                 $get_groups = $db->query("SELECT *
             FROM " . TABLE_PREFIX . "usergroups
             WHERE gid = {$group}
-            ORDER BY title ASC
+            ORDER BY usertitle ASC
             ");
                 $row = $db->fetch_array($get_groups);
 
-                $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
+                $select_group .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
             }
 
         }
@@ -525,10 +526,10 @@ function application_showthread()
         ");
         $select_additiongroup = "";
         while ($row = $db->fetch_array($get_groups)) {
-            $select_additiongroup .= "<option value='{$row['gid']}'>{$row['title']}</option>";
+            $select_additiongroup .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
         }
-        $uid = $db->fetch_field($db->simple_select("applications", "uid", "uid = {$tuid}"), "uid");
-        if ($mybb->usergroup['canmodcp'] == 1 && $tuid == $uid) {
+
+        if ($mybb->usergroup['canmodcp'] == 1) {
             eval ("\$application_wob .= \"" . $templates->get("application_wob") . "\";");
         }
     }
@@ -578,12 +579,13 @@ function application_misc()
             $uid = $row['uid'];
             $extradays = $row['appdays'];
             $extendcount = $row['appcount'];
-            if ($row['appcount'] < $app_renewcount && empty($row['corrector']) && $uid == $mybb->user['uid']) {
-                $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
-            } elseif (empty($row['corrector']) && $mybb->usergroup['canmodcp'] == 1) {
-                $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
-            }
+            $as_uid = $row['as_uid'];
 
+            if ($as_uid == $mybb->user['uid'] or $uid = $mybb->user['uid'] or $as_uid == $mybb->user['as_uid']) {
+                if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
+                    $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
+                }
+            }
 
             $charaname = $chara = build_profile_link($row['username'], $row['uid']);
 
@@ -595,6 +597,7 @@ function application_misc()
                 $extenddays = $row['appdays'] * $faktor;
                 $deadline = $deadline + $extenddays;
             }
+
 
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
             if ($dayscount > 0) {
@@ -683,10 +686,10 @@ function application_misc()
         $wobtext = $mybb->settings['app_wobtext'];
         $author = $mybb->input['uid'];
         $usergroup = $mybb->input['usergroup'];
-        $username = $mybb->user['username'];
+        $subject = "{$mybb->input['subject']}";
+        $username = $db->escape_string($mybb->user['username']);
         $posttid = $mybb->input['tid'];
         $fid = $mybb->input['fid'];
-        $subject = $db->fetch_field($db->simple_select("threads", "subject", "tid = {$posttid}"), "subject");
         $uid = $mybb->user['uid'];
         $ownip = $db->fetch_field($db->query("SELECT ip FROM " . TABLE_PREFIX . "sessions WHERE " . TABLE_PREFIX . "sessions.uid = '$uid'"), "ownip");
 
@@ -743,17 +746,8 @@ function application_misc()
 
         );
         $db->update_query("threads", $new_record, "tid = '$posttid'");
+
         $db->delete_query("applications", "uid = {$author}");
-
-        // Alert auslösen, weil wir wollen ja bescheid wissen, ne?!
-        if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
-            $alertType = MybbStuff_MyAlerts_AlertTypeManager::getInstance()->getByCode('alert_wob');
-            if ($alertType != NULL && $alertType->getEnabled() && $author != $mybb->user['uid']) {
-                $alert = new MybbStuff_MyAlerts_Entity_Alert((int) $author, $alertType);
-                MybbStuff_MyAlerts_AlertManager::getInstance()->addAlert($alert);
-            }
-        }
-
         redirect("showthread.php?tid={$posttid}");
     }
 }
@@ -771,7 +765,6 @@ function application_global()
     $app_maindays = intval($mybb->settings['app_maindays']);
     $appforum = intval($mybb->settings['app_appforum']);
     $appchecklist = $mybb->settings['app_checklist'];
-
     // Funktion ausführen, bei der neue User hinzugefügt oder gelöscht werden soll
     getApplication();
 
@@ -779,7 +772,6 @@ function application_global()
     Bewerberfrist
     */
 
-    // Einmal schauen, ob man mit Mainaccount oder Zweitaccount online ist
     $uid = intval($mybb->user['uid']);
     $app_query = $db->query("SELECT *
             FROM " . TABLE_PREFIX . "applications
@@ -885,6 +877,16 @@ function getApplication()
         $db->delete_query("applications", "uid = {$deletecharas['uid']}");
     }
 
+    $get_deleteuser_wobuser = $db->query("SELECT uid
+    FROM " . TABLE_PREFIX . "applications 
+    where uid not in (SELECT uid
+    FROM " . TABLE_PREFIX . "users
+    where usergroup = 2)
+    ");
+
+  while ($deletecharas = $db->fetch_array($get_deleteuser_wobuser)) {
+      $db->delete_query("applications", "uid = {$deletecharas['uid']}");
+  }
 
     /*
      * Bewerber in die Datenbank laden. 
@@ -1061,4 +1063,24 @@ function application_member_profile()
         $wob = $lang->app_nowob_profile;
     }
 
+}
+
+function application_user_activity($user_activity)
+{
+    global $user;
+    if (my_strpos($user['location'], "misc.php?action=application") !== false) {
+        $user_activity['activity'] = "application";
+    }
+
+    return $user_activity;
+}
+
+function application_location_activity($plugin_array)
+{
+    global $db, $mybb, $lang;
+    $lang->load('application');
+    if ($plugin_array['user_activity']['activity'] == "application") {
+        $plugin_array['location_name'] = $lang->app_wiw;
+    }
+    return $plugin_array;
 }
