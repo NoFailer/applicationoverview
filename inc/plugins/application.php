@@ -781,29 +781,11 @@ function application_global()
 
     // Einmal schauen, ob man mit Mainaccount oder Zweitaccount online ist
     $uid = intval($mybb->user['uid']);
-    $as_uid = intval($mybb->user['as_uid']);
-    // suche alle angehangenen accounts
-    if ($as_uid == 0) {
-        $select = $db->query("SELECT * FROM " . TABLE_PREFIX . "users 
-        WHERE (as_uid = $uid) OR (uid = $uid)
-        and usergroup = 2
-        ORDER BY username ASC");
-    } else if ($as_uid != 0) {
-        //id des users holen wo alle angehangen sind
-        $select = $db->query("SELECT * FROM " . TABLE_PREFIX . "users 
-        WHERE (as_uid = $as_uid) OR (uid = $uid) OR (uid = $as_uid) 
-           and usergroup = 2
-        ORDER BY username ASC");
-    }
-
-    while ($app = $db->fetch_array($select)) {
-        $application_alert = "";
-        $uid = $app['uid'];
-        $app_query = $db->query("SELECT *
-        FROM " . TABLE_PREFIX . "applications
-        where uid = {$uid}
-        ");
-        $application = $db->fetch_array($app_query);
+    $app_query = $db->query("SELECT *
+            FROM " . TABLE_PREFIX . "applications
+            where uid = {$uid}
+            ");
+    while ($application = $db->fetch_array($app_query)) {
         if (!empty($application)) {
             $extradays = $application['appdays'];
             $extendcount = $application['appcount'];
@@ -816,17 +798,19 @@ function application_global()
             }
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
 
-            if ($dayscount <= $app_alert && $dayscount > 0) {
-                $get_app_alert = $lang->sprintf($lang->app_alert, $dayscount);
-            } else {
-                $get_app_alert = (isset($lang->app_alertdown) ? $lang->app_alertdown : false);
-                ;
+            if ($mybb->user['usergroup'] == 2) {
+                if ($dayscount <= $app_alert && $dayscount > 0) {
+                    $get_app_alert = $lang->sprintf($lang->app_alert, $dayscount);
+                    eval ("\$application_alert = \"" . $templates->get("application_alert") . "\";");
+                } elseif ($dayscount <= 0) {
+                    $get_app_alert = $lang->app_alertdown;
+                    eval ("\$application_alert = \"" . $templates->get("application_alert") . "\";");
+                } else {
+                    $application = "";
+                }
             }
 
-            $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = {$uid} and fid = {$appforum}"));
-            if (empty($get_thread)) {
-                eval ("\$application_alert = \"" . $templates->get("application_alert") . "\";");
-            }
+            
         }
     }
 
