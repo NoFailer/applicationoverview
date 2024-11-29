@@ -495,11 +495,11 @@ function application_showthread()
         FROM " . TABLE_PREFIX . "usergroups
         where gid != 1
         and gid != 2
-        ORDER BY usertitle ASC
+        ORDER BY title ASC
         ");
             $select_group = "";
             while ($row = $db->fetch_array($get_groups)) {
-                $select_group .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
+                $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
             }
         } else {
             $allgroups = explode(",", $app_groups);
@@ -508,11 +508,11 @@ function application_showthread()
                 $get_groups = $db->query("SELECT *
             FROM " . TABLE_PREFIX . "usergroups
             WHERE gid = {$group}
-            ORDER BY usertitle ASC
+            ORDER BY title ASC
             ");
                 $row = $db->fetch_array($get_groups);
 
-                $select_group .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
+                $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
             }
 
         }
@@ -522,11 +522,11 @@ function application_showthread()
         FROM " . TABLE_PREFIX . "usergroups
         where gid != 1
         and gid != 2
-        ORDER BY usertitle ASC
+        ORDER BY title ASC
         ");
         $select_additiongroup = "";
         while ($row = $db->fetch_array($get_groups)) {
-            $select_additiongroup .= "<option value='{$row['gid']}'>{$row['usertitle']}</option>";
+            $select_additiongroup .= "<option value='{$row['gid']}'>{$row['title']}</option>";
         }
 
         if ($mybb->usergroup['canmodcp'] == 1) {
