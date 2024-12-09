@@ -659,17 +659,17 @@ function application_misc()
 
         if ($correct) {
 
-            $corretor = $mybb->user['uid'];
+            $corrector = $mybb->user['uid'];
 
             $get_correct = array(
-                'corrector' => $corretor,
+                'corrector' => $corrector,
             );
 
 
             // Alert auslösen, weil wir wollen ja bescheid wissen, ne?!
             if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
                 $alertType = MybbStuff_MyAlerts_AlertTypeManager::getInstance()->getByCode('alert_getcorrect');
-                if ($alertType != NULL && $alertType->getEnabled() && $corretor != $correct) {
+                if ($alertType != NULL && $alertType->getEnabled() && $corrector != $correct) {
                     $alert = new MybbStuff_MyAlerts_Entity_Alert((int) $correct, $alertType);
                     MybbStuff_MyAlerts_AlertManager::getInstance()->addAlert($alert);
                 }
