@@ -4,6 +4,10 @@
 if (!defined("IN_MYBB")) {
     die("Direct initialization of this file is not allowed.");
 }
+/**
+ * Globals.
+ */
+global $plugins;
 
 $plugins->add_hook('misc_start', 'application_misc');
 $plugins->add_hook('global_start', 'application_global');
@@ -581,7 +585,7 @@ function application_misc()
             $extendcount = $row['appcount'];
             $as_uid = $row['as_uid'];
 
-            if ($as_uid == $mybb->user['uid'] or $uid = $mybb->user['uid'] or $as_uid == $mybb->user['as_uid']) {
+            if ($as_uid == $mybb->user['uid'] or $uid == $mybb->user['uid'] or $as_uid == $mybb->user['as_uid']) {
                 if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
                     $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
                 }
