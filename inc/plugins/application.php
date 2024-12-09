@@ -479,7 +479,7 @@ function application_showthread()
         // korrigiert von
         $tuid = $thread['uid'];
         $correct = $db->fetch_field($db->simple_select("applications", "corrector", "uid = {$tuid}"), "corrector");
-
+	if($mybb->user['canmodcp'] == 1){
         if (!empty($correct)) {
             $c_user = $db->fetch_array($db->query("SELECT * FROM " . TABLE_PREFIX . "users WHERE uid = {$correct}"));
             $c_name = format_name($c_user['username'], $c_user['usergroup'], $c_user['displaygroup']);
@@ -489,6 +489,7 @@ function application_showthread()
             $add_correct = "<a href='misc.php?action=application_overview&correct={$tuid}' title='{$lang->app_correct_text}'>{$lang->app_correct_text}</a>";
             $correcteur = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no) . " " . $add_correct;
         }
+	}
         eval ("\$application_correct = \"" . $templates->get("application_correct") . "\";");
         if ($app_groups == -1) {
             $get_groups = $db->query("SELECT *
