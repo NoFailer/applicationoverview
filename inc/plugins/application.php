@@ -146,7 +146,6 @@ function application_install()
     }
 
 
-
     // Templates einfügen
     $insert_array = array(
         'title' => 'application_alert',
@@ -564,6 +563,11 @@ function application_misc()
         ORDER BY a.appdeadline ASC
         ");
 
+        $user = $mybb->user;
+        if ($user["as_uid"] > 0) {
+            $user = $db->simple_select('users', '*', "uid = {$user["as_uid"]}");
+        }
+
         while ($row = $db->fetch_array($get_app)) {
             // variabeln leeren
             $charaname = "";
@@ -612,12 +616,15 @@ function application_misc()
 
             $deadline = date("d.m.y", $deadline);
 
-            $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = {$uid} and fid = {$appforum}"));
+            $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = $uid and fid = $appforum"));
 
             if (!empty($get_thread)) {
                 $app_thread = "<a href='showthread.php?tid={$get_thread['tid']}'>{$lang->app_thread}</a>";
-                if (empty($row['corrector']) && $mybb->usergroup['canmodcp'] == 1) {
-                    $add_correct = "<a href='misc.php?action=application_overview&correct={$uid}' title='{$lang->app_correct_text}'>{$lang->app_addcorrecteur}</a>";
+                if ($user["as_uid"] > 0) {
+                    $user = $db->simple_select('users', '*', "uid = {$user["as_uid"]}");
+                }
+                if (empty($row['corrector']) && $user['usergroup'] == 4) {
+                    $add_correct = "<a href='misc.php?action=application_overview&correct=$uid' title='$lang->app_correct_text'>$lang->app_addcorrecteur</a>";
                 } else {
                     $corr_name = $db->fetch_field($db->simple_select("userfields", $playername, "ufid = {$row['corrector']}"), $playername);
                     if (!empty($corr_name)) {
@@ -646,7 +653,7 @@ function application_misc()
             $extracount = $charainfos['appcount'] + 1;
 
             $extend_app = array(
-                'appdays' => (int) $extradays,
+                'appdays' => (int)$extradays,
                 'appcount' => $extracount
             );
 
@@ -670,7 +677,7 @@ function application_misc()
             if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
                 $alertType = MybbStuff_MyAlerts_AlertTypeManager::getInstance()->getByCode('alert_getcorrect');
                 if ($alertType != NULL && $alertType->getEnabled() && $corrector != $correct) {
-                    $alert = new MybbStuff_MyAlerts_Entity_Alert((int) $correct, $alertType);
+                    $alert = new MybbStuff_MyAlerts_Entity_Alert((int)$correct, $alertType);
                     MybbStuff_MyAlerts_AlertManager::getInstance()->addAlert($alert);
                 }
             }
@@ -806,7 +813,7 @@ function application_global()
                 }
             }
 
-            
+
         }
     }
 
@@ -888,9 +895,9 @@ function getApplication()
     where usergroup = 2)
     ");
 
-  while ($deletecharas = $db->fetch_array($get_deleteuser_wobuser)) {
-      $db->delete_query("applications", "uid = {$deletecharas['uid']}");
-  }
+    while ($deletecharas = $db->fetch_array($get_deleteuser_wobuser)) {
+        $db->delete_query("applications", "uid = {$deletecharas['uid']}");
+    }
 
     /*
      * Bewerber in die Datenbank laden. 
@@ -993,6 +1000,7 @@ function application_alerts()
             new MybbStuff_MyAlerts_Formatter_AppCorrectFormatter($mybb, $lang, 'alert_getcorrect')
         );
     }
+
     /**
      * Alert, wenn der Steckbrief zur Korrektur übernommen worden ist.
      */
