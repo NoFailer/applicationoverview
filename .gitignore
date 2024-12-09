@@ -1,0 +1,7 @@
+*
+!inc
+!inc/plugins
+!inc/plugins/*
+!inc/plugins/application.php
+!.gitignore
+!README.md
