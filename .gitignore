@@ -1,7 +1,10 @@
 *
+!images
+!images/*
 !inc
 !inc/plugins
 !inc/plugins/*
 !inc/plugins/application.php
+!inc/languages/deutsch_du/application.lang.php
 !.gitignore
 !README.md
