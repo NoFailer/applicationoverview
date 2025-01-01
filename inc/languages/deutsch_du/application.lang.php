@@ -35,7 +35,7 @@ $l['app_showthread_correct_no'] = "Niemanden";
 
 // Profil
 $l['app_wob_profile'] = "Wob erhalten am {1}";
-$l['app_nowob_profile'] = "noch kein Wob erhalten";
+$l['app_nowob_profile'] = "Noch kein Wob erhalten";
 // Alerts
 $l['alert_getcorrect'] = "{1} hat deine Korrektur übernommen.";
 $l['alert_wob'] = "{1} hat deinen Steckbrief angenommen.";

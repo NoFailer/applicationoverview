@@ -24,9 +24,9 @@ $plugins->add_hook('member_profile_end', 'application_member_profile');
 $plugins->add_hook('fetch_wol_activity_end', 'application_user_activity');
 $plugins->add_hook('build_friendly_wol_location_end', 'application_location_activity');
 
-function application_info()
+function application_info(): array
 {
-    return array(
+    return [
         "name" => "Bewerberverwaltung",
         "description" => "In diesem Plugin kannst du zum einen die Bewerberchecklist verwalten, ihnen die Möglichkeit, sich selbst zu verlängern und ihnen im Postbit über ein Dropdown annehmen.",
         "website" => "",
@@ -36,7 +36,7 @@ function application_info()
         "guid" => "",
         "codename" => "",
         "compatibility" => "18*"
-    );
+    ];
 }
 
 function application_install()
@@ -54,10 +54,7 @@ function application_install()
             `corrector` int(10) NOT NULL,
             PRIMARY KEY (`app_id`)
           ) ENGINE=MyISAM" . $db->build_create_table_collation());
-
         $db->query("ALTER TABLE `" . TABLE_PREFIX . "users` ADD `wobdate` varchar(400) CHARACTER SET utf8 NOT NULL;");
-
-
     }
 
     // Einstellungen
@@ -404,29 +401,56 @@ function application_uninstall()
 
 function application_activate()
 {
-    global $db, $cache;
+    global $db, $cache, $mybb, $lang;
 
     if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
         $alertTypeManager = MybbStuff_MyAlerts_AlertTypeManager::getInstance();
-
         if (!$alertTypeManager) {
             $alertTypeManager = MybbStuff_MyAlerts_AlertTypeManager::createInstance($db, $cache);
         }
-
+        /**
+         * @Adriano: Alert for corrector/correction activity.
+         */
         $alertType = new MybbStuff_MyAlerts_Entity_AlertType();
-        $alertType->setCode('alert_getcorrect'); // The codename for your alert type. Can be any unique string.
-        $alertType->setEnabled(true);
-        $alertType->setCanBeUserDisabled(true);
-
+        $alertType->setCode('alert_getcorrect');
+        $alertType->setEnabled();
+        $alertType->setCanBeUserDisabled();
         $alertTypeManager->add($alertType);
-
+        /**
+         * @Adriano: Alert for Welcome On Board.
+         */
         $alertType = new MybbStuff_MyAlerts_Entity_AlertType();
-        $alertType->setCode('alert_wob'); // The codename for your alert type. Can be any unique string.
-        $alertType->setEnabled(true);
-        $alertType->setCanBeUserDisabled(true);
-
+        $alertType->setCode('alert_wob');
+        $alertType->setEnabled();
+        $alertType->setCanBeUserDisabled();
+        $alertTypeManager->add($alertType);
+        /**
+         * @Adriano: Alert for reaching the deadline.
+         */
+        $alertType = new MybbStuff_MyAlerts_Entity_AlertType();
+        $alertType->setCode('alert_application_deadline_reached');
+        $alertType->setEnabled();
+        $alertType->setCanBeUserDisabled(false);
         $alertTypeManager->add($alertType);
     }
+
+    /**
+     * @Adriano: Create daily task.
+     */
+    $task = [
+        'title' => 'Application Deadline Task',
+        'description' => 'Schaut täglich um Mitternacht nach abgelaufenen Bewerberfristen.',
+        'file' => 'application',
+        'minute' => 0,
+        'hour' => 0,
+        'day' => "*",
+        'month' => '*',
+        'weekday' => '*',
+        'nextrun' => strtotime('tomorrow'),
+        'logging' => 1,
+        'locked' => 0
+    ];
+    $db->insert_query('tasks', $task);
 
     require MYBB_ROOT . "/inc/adminfunctions_templates.php";
     find_replace_templatesets("header", "#" . preg_quote('{$pm_notice}') . "#i", '{$application_alert} {$pm_notice}');
@@ -443,25 +467,27 @@ function application_activate()
 function application_deactivate()
 {
     global $db, $cache;
-
     if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
         $alertTypeManager = MybbStuff_MyAlerts_AlertTypeManager::getInstance();
-
         if (!$alertTypeManager) {
             $alertTypeManager = MybbStuff_MyAlerts_AlertTypeManager::createInstance($db, $cache);
         }
-
         $alertTypeManager->deleteByCode('alert_getcorrect');
         $alertTypeManager->deleteByCode('alert_wob');
+        $alertTypeManager->deleteByCode('alert_application_deadline_reached');
     }
+
+    /**
+     * @Adriano: Delete task.
+     */
+    $db->delete_query('tasks', "file = 'application'");
+
     require MYBB_ROOT . "/inc/adminfunctions_templates.php";
     find_replace_templatesets("header", "#" . preg_quote('{$application_alert}') . "#i", '', 0);
     find_replace_templatesets("header", "#" . preg_quote('{$checklist}') . "#i", '', 0);
     find_replace_templatesets("member_profile", "#" . preg_quote('{$wob}<br />') . "#i", '', 0);
     find_replace_templatesets("showthread", "#" . preg_quote('{$application_correct}') . "#i", '', 0);
     find_replace_templatesets("showthread", "#" . preg_quote('{$application_wob}') . "#i", '', 0);
-
-
 }
 
 
@@ -943,20 +969,25 @@ function application_alerts()
     $lang->load('application');
 
     /**
-     * Alert, wenn der Steckbrief zur Korrektur übernommen worden ist.
+     * @Adriano: Alert for correction activity.
      */
-    class MybbStuff_MyAlerts_Formatter_AppCorrectFormatter extends MybbStuff_MyAlerts_Formatter_AbstractFormatter
+    class AppCorrectFormatter extends MybbStuff_MyAlerts_Formatter_AbstractFormatter
     {
         /**
+         * Init function called before running formatAlert(). Used to load language files and initialize other required
+         * resources.
+         * @return void
+         */
+        public function init()
+        {}
+
+        /**
          * Format an alert into it's output string to be used in both the main alerts listing page and the popup.
-         *
          * @param MybbStuff_MyAlerts_Entity_Alert $alert The alert to format.
-         *
          * @return string The formatted alert string.
          */
-        public function formatAlert(MybbStuff_MyAlerts_Entity_Alert $alert, array $outputAlert)
+        public function formatAlert(MybbStuff_MyAlerts_Entity_Alert $alert, array $outputAlert): string
         {
-            $alertContent = $alert->getExtraDetails();
             return $this->lang->sprintf(
                 $this->lang->alert_getcorrect,
                 $outputAlert['from_user'],
@@ -964,59 +995,37 @@ function application_alerts()
             );
         }
 
-
-        /**
-         * Init function called before running formatAlert(). Used to load language files and initialize other required
-         * resources.
-         *
-         * @return void
-         */
-        public function init()
-        {
-        }
-
         /**
          * Build a link to an alert's content so that the system can redirect to it.
-         *
          * @param MybbStuff_MyAlerts_Entity_Alert $alert The alert to build the link for.
-         *
          * @return string The built alert, preferably an absolute link.
          */
-        public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert)
+        public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert): string
         {
-            $alertContent = $alert->getExtraDetails();
-            return;
+            return "";
         }
-    }
-
-
-    if (class_exists('MybbStuff_MyAlerts_AlertFormatterManager')) {
-        $formatterManager = MybbStuff_MyAlerts_AlertFormatterManager::getInstance();
-
-        if (!$formatterManager) {
-            $formatterManager = MybbStuff_MyAlerts_AlertFormatterManager::createInstance($mybb, $lang);
-        }
-
-        $formatterManager->registerFormatter(
-            new MybbStuff_MyAlerts_Formatter_AppCorrectFormatter($mybb, $lang, 'alert_getcorrect')
-        );
     }
 
     /**
-     * Alert, wenn der Steckbrief zur Korrektur übernommen worden ist.
+     * @Adriano: Alert for Welcome On Board.
      */
-    class MybbStuff_MyAlerts_Formatter_AppWobFormatter extends MybbStuff_MyAlerts_Formatter_AbstractFormatter
+    class AppWobFormatter extends MybbStuff_MyAlerts_Formatter_AbstractFormatter
     {
         /**
+         * Init function called before running formatAlert(). Used to load language files and initialize other required
+         * resources.
+         * @return void
+         */
+        public function init()
+        {}
+
+        /**
          * Format an alert into it's output string to be used in both the main alerts listing page and the popup.
-         *
          * @param MybbStuff_MyAlerts_Entity_Alert $alert The alert to format.
-         *
          * @return string The formatted alert string.
          */
-        public function formatAlert(MybbStuff_MyAlerts_Entity_Alert $alert, array $outputAlert)
+        public function formatAlert(MybbStuff_MyAlerts_Entity_Alert $alert, array $outputAlert): string
         {
-            $alertContent = $alert->getExtraDetails();
             return $this->lang->sprintf(
                 $this->lang->alert_wob,
                 $outputAlert['from_user'],
@@ -1024,41 +1033,78 @@ function application_alerts()
             );
         }
 
+        /**
+         * Build a link to an alert's content so that the system can redirect to it.
+         * @param MybbStuff_MyAlerts_Entity_Alert $alert The alert to build the link for.
+         * @return string The built alert, preferably an absolute link.
+         */
+        public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert): string
+        {
+            return "";
+        }
+    }
+
+    /**
+     * @Adriano: Alert for reaching the deadline.
+     */
+    class AppDeadlineFormatter extends MybbStuff_MyAlerts_Formatter_AbstractFormatter
+    {
 
         /**
          * Init function called before running formatAlert(). Used to load language files and initialize other required
          * resources.
-         *
          * @return void
          */
         public function init()
+        {}
+
+        /**
+         * Format an alert into it's output string to be used in both the main alerts listing page and the popup.
+         * @param MybbStuff_MyAlerts_Entity_Alert $alert The alert to format.
+         * @return string The formatted alert string.
+         */
+        public function formatAlert(MybbStuff_MyAlerts_Entity_Alert $alert, array $outputAlert): string
         {
+            $extraDetails = $alert->getExtraDetails();
+            if(array_key_exists("application_username", $extraDetails)) {
+                $applicant_username = $extraDetails["application_username"];
+                return "Die Bewerbungsfrist für $applicant_username ist abgelaufen.";
+            }
+            return "Die Bewerbungsfrist für einen Bewerber ist abgelaufen.";
         }
 
         /**
          * Build a link to an alert's content so that the system can redirect to it.
-         *
          * @param MybbStuff_MyAlerts_Entity_Alert $alert The alert to build the link for.
-         *
          * @return string The built alert, preferably an absolute link.
          */
-        public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert)
+        public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert): string
         {
-            $alertContent = $alert->getExtraDetails();
-            return;
+            $extraDetails = $alert->getExtraDetails();
+            if(array_key_exists("application_uid", $extraDetails)) {
+                $applicant_uid = $extraDetails["application_uid"];
+                return get_profile_link($applicant_uid);
+            }
+            return "https://www.hauntedandholy.de/misc.php?action=application_overview";
         }
     }
 
-
+    /**
+     * @Adriano: Instead of doing this after every custom formatter, register all of them in one place.
+     */
     if (class_exists('MybbStuff_MyAlerts_AlertFormatterManager')) {
         $formatterManager = MybbStuff_MyAlerts_AlertFormatterManager::getInstance();
-
         if (!$formatterManager) {
             $formatterManager = MybbStuff_MyAlerts_AlertFormatterManager::createInstance($mybb, $lang);
         }
-
         $formatterManager->registerFormatter(
-            new MybbStuff_MyAlerts_Formatter_AppWobFormatter($mybb, $lang, 'alert_wob')
+            new AppCorrectFormatter($mybb, $lang, 'alert_getcorrect')
+        );
+        $formatterManager->registerFormatter(
+            new AppWobFormatter($mybb, $lang, 'alert_wob')
+        );
+        $formatterManager->registerFormatter(
+            new AppDeadlineFormatter($mybb, $lang, 'alert_application_deadline_reached')
         );
     }
 }

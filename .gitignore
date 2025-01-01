@@ -2,9 +2,11 @@
 !images
 !images/*
 !inc
+!inc/languages/deutsch_du/application.lang.php
 !inc/plugins
 !inc/plugins/*
 !inc/plugins/application.php
-!inc/languages/deutsch_du/application.lang.php
+!inc/tasks
+!inc/tasks/application.php
 !.gitignore
 !README.md
