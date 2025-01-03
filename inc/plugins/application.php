@@ -198,9 +198,7 @@ function application_install()
 
     $insert_array = array(
         'title' => 'application_correct',
-        'template' => $db->escape_string('<div>
-	{$correcteur}
-</div>'),
+        'template' => $db->escape_string('<div>{$corrector_display_text}</div>'),
         'sid' => '-1',
         'version' => '',
         'dateline' => TIME_NOW
@@ -243,7 +241,7 @@ function application_install()
         'title' => 'application_misc_bit',
         'template' => $db->escape_string('<tr>
 	<td class="trow1">
-		{$charaname}
+		{$character_name}
 	</td>
 	<td class="trow2">
 		{$lang->app_daysleft} <b>{$dayscount}</b> (du hast insgesamt {$extendcount} Verlängert)
@@ -493,40 +491,54 @@ function application_deactivate()
 
 function application_showthread()
 {
-    global $thread, $db, $mybb, $forum, $templates, $lang, $select_group, $tid, $application_wob, $correcteur, $application_correct;
+    global $thread, $db, $mybb, $forum, $templates, $lang, $select_group, $tid, $application_wob, $corrector_display_text, $application_correct;
     $lang->load("application");
-
-    // settings
+    /**
+     * @Adriano: To prevent "variable undefined" errors.
+     */
+    $corrector_display_text = "";
+    /**
+     * @Adriano: Get settings.
+     */
     $app_groups = $mybb->settings['app_groups'];
     $app_forum = $mybb->settings['app_appforum'];
-    //variabeln leeren
-    $tid = 0;
+    /**
+     * @Adriano: Get thread id.
+     */
     $tid = $thread['tid'];
-
+    /**
+     * @Adriano: Check if thread id matches thread id ("app_appforum") from the settings.
+     */
     if ($app_forum == $thread['fid']) {
-
-        // korrigiert von
-        $tuid = $thread['uid'];
-        $correct = $db->fetch_field($db->simple_select("applications", "corrector", "uid = {$tuid}"), "corrector");
-	if($mybb->user['canmodcp'] == 1){
-        if (!empty($correct)) {
-            $c_user = $db->fetch_array($db->query("SELECT * FROM " . TABLE_PREFIX . "users WHERE uid = {$correct}"));
-            $c_name = format_name($c_user['username'], $c_user['usergroup'], $c_user['displaygroup']);
-            $charalink = build_profile_link($c_name, $c_user['uid']);
-            $correcteur = $lang->sprintf($lang->app_showthread_correct, $charalink);
-        } else {
-            $add_correct = "<a href='misc.php?action=application_overview&correct={$tuid}' title='{$lang->app_correct_text}'>{$lang->app_correct_text}</a>";
-            $correcteur = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no) . " " . $add_correct;
+        /**
+         * Adriano: Show who is currently correcting/checking the application.
+         */
+        $thread_uid = $thread['uid'];
+        $corrector_display_text = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no);
+        $corrector_uid = $db->fetch_field($db->simple_select("applications", "corrector", "uid = {$thread_uid}"), "corrector");
+        if ($corrector_uid) {
+            $user_information_query = $db->simple_select("users", "username, usergroup, displaygroup", "uid = $corrector_uid");
+            $username = $db->fetch_field($user_information_query, "username");
+            $usergroup = $db->fetch_field($user_information_query, "usergroup");
+            $displaygroup = $db->fetch_field($user_information_query, "displaygroup");
+            $formatted_username = format_name($username, $usergroup, $displaygroup);
+            $profile_link = build_profile_link($formatted_username, $corrector_uid);
+            /**
+             * @Adriano: Removed "$lang->app_showthread_correct" because custom template contains a different text.
+             */
+            $corrector_display_text = $lang->sprintf($lang->app_showthread_correct, $profile_link);
+        } else if($mybb->usergroup['canmodcp'] == 1) {
+            $add_correct = "<a href='misc.php?action=application_overview&correct=$thread_uid' title='$lang->app_correct_text'>$lang->app_correct_text</a>";
+            $corrector_display_text = "$corrector_display_text $add_correct";
         }
-	}
         eval ("\$application_correct = \"" . $templates->get("application_correct") . "\";");
         if ($app_groups == -1) {
             $get_groups = $db->query("SELECT *
-        FROM " . TABLE_PREFIX . "usergroups
-        where gid != 1
-        and gid != 2
-        ORDER BY title ASC
-        ");
+                FROM " . TABLE_PREFIX . "usergroups
+                where gid != 1
+                and gid != 2
+                ORDER BY title ASC
+            ");
             $select_group = "";
             while ($row = $db->fetch_array($get_groups)) {
                 $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
@@ -536,29 +548,26 @@ function application_showthread()
 
             foreach ($allgroups as $group) {
                 $get_groups = $db->query("SELECT *
-            FROM " . TABLE_PREFIX . "usergroups
-            WHERE gid = {$group}
-            ORDER BY title ASC
-            ");
+                    FROM " . TABLE_PREFIX . "usergroups
+                    WHERE gid = {$group}
+                    ORDER BY title ASC
+                ");
                 $row = $db->fetch_array($get_groups);
-
                 $select_group .= "<option value='{$row['gid']}'>{$row['title']}</option>";
             }
 
         }
-
         // additionalgroups
         $get_groups = $db->query("SELECT *
-        FROM " . TABLE_PREFIX . "usergroups
-        where gid != 1
-        and gid != 2
-        ORDER BY title ASC
+            FROM " . TABLE_PREFIX . "usergroups
+            where gid != 1
+            and gid != 2
+            ORDER BY title ASC
         ");
         $select_additiongroup = "";
         while ($row = $db->fetch_array($get_groups)) {
             $select_additiongroup .= "<option value='{$row['gid']}'>{$row['title']}</option>";
         }
-
         if ($mybb->usergroup['canmodcp'] == 1) {
             eval ("\$application_wob .= \"" . $templates->get("application_wob") . "\";");
         }
@@ -578,53 +587,30 @@ function application_misc()
     $appforum = intval($mybb->settings['app_appforum']);
 
     if ($mybb->get_input('action') == 'application_overview') {
-
         add_breadcrumb($lang->app_overview, "misc.php?action=application_overview");
         $lang->app_overview_text = $lang->sprintf($lang->app_overview_text, $app_renewcount, $app_renewdays);
-
-        $get_app = $db->query("SELECT *
-        FROM " . TABLE_PREFIX . "applications a
-        LEFT JOIN " . TABLE_PREFIX . "users u
-        on (a.uid = u.uid)
-        where u.usergroup = 2
-        ORDER BY a.appdeadline ASC
-        ");
-
+        $table_prefix = TABLE_PREFIX;
+        $get_app = $db->query("SELECT * FROM {$table_prefix}applications a LEFT JOIN {$table_prefix}users u ON (a.uid = u.uid) WHERE u.usergroup = 2 ORDER BY a.appdeadline ASC");
         $user = $mybb->user;
         if ($user["as_uid"] > 0) {
             $user = $db->simple_select('users', '*', "uid = {$user["as_uid"]}");
         }
-
         while ($row = $db->fetch_array($get_app)) {
-            // variabeln leeren
-            $charaname = "";
-            $dayscount = 0;
-            $extendcount = 0;
-            $deadline = "";
-            $correct = "";
-            $appthread = "";
-            $regdate = "";
-            $get_deadline = "";
-            $uid = "";
-            $extend = "";
-            $app_thread = "";
+            /**
+             * @Adriano: Default values.
+             */
+            $app_thread = $lang->app_nothread;
             $add_correct = "";
-            $app_addcorrecteur = "";
-
             $uid = $row['uid'];
             $extradays = $row['appdays'];
             $extendcount = $row['appcount'];
             $as_uid = $row['as_uid'];
-
+            $character_name = build_profile_link($row['username'], $row['uid']);
             if ($as_uid == $mybb->user['uid'] or $uid == $mybb->user['uid'] or $as_uid == $mybb->user['as_uid']) {
                 if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
-                    $extend = "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
+                    $character_name .= "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
                 }
             }
-
-            $charaname = $chara = build_profile_link($row['username'], $row['uid']);
-
-            $charaname = $charaname . $extend;
             $regdate = $row['regdate'];
             $deadline = $row['appdeadline'];
             $faktor = 86400;
@@ -642,9 +628,7 @@ function application_misc()
             }
 
             $deadline = date("d.m.y", $deadline);
-
             $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = $uid and fid = $appforum"));
-
             if (!empty($get_thread)) {
                 $app_thread = "<a href='showthread.php?tid={$get_thread['tid']}'>{$lang->app_thread}</a>";
                 if ($user["as_uid"] > 0) {
@@ -653,53 +637,49 @@ function application_misc()
                 if (empty($row['corrector']) && $user['usergroup'] == 4) {
                     $add_correct = "<a href='misc.php?action=application_overview&correct=$uid' title='$lang->app_correct_text'>$lang->app_addcorrecteur</a>";
                 } else {
-                    $corr_name = $db->fetch_field($db->simple_select("userfields", $playername, "ufid = {$row['corrector']}"), $playername);
-                    if (!empty($corr_name)) {
-                        $add_correct = "<div class='smalltext'>{$lang->app_correcteur} {$corr_name}</div>";
-                    } else {
-                        $add_correct = "";
+                    /**
+                     * @Adriano: It makes more sense and is much easier to get the username from the users table.
+                     * It is always set and cannot be empty. We cannot trust user data that is optional if we want to
+                     * always display a name.
+                     */
+                    $username_query = $db->simple_select("userfields", $playername, "ufid = {$row['corrector']}");
+                    $username = $db->fetch_field($username_query, $playername);
+                    /**
+                     * Fallback because not everyone has set their playername.
+                     */
+                    if(!$username) {
+                        $username_query = $db->simple_select("users", "username", "uid = {$row['corrector']}");
+                        $username = $db->fetch_field($username_query, "username");
                     }
-
+                    $profile_link = build_profile_link($username, $row['corrector'], "_blank");
+                    $add_correct = "<div class='smalltext'>$lang->app_correcteur $profile_link</div>";
                 }
-            } else {
-                $app_thread = $lang->app_nothread;
-
             }
-
             eval ("\$application_bit .= \"" . $templates->get("application_misc_bit") . "\";");
         }
 
         // Bewerbung verlängern
         $extend = $mybb->input['extend'];
         if ($extend) {
-
             $query = $db->simple_select("applications", "*", "uid = {$extend}");
             $charainfos = $db->fetch_array($query);
-
             $extradays = $charainfos['appdays'] + $app_renewdays;
             $extracount = $charainfos['appcount'] + 1;
-
             $extend_app = array(
                 'appdays' => (int)$extradays,
                 'appcount' => $extracount
             );
-
             $db->update_query("applications", $extend_app, "uid = {$extend}");
             redirect("misc.php?action=application_overview");
         }
 
         // Bewerbung übernehmen
-        $correct = $mybb->input['correct'];
-
+        $correct = $mybb->get_input('correct');
         if ($correct) {
-
             $corrector = $mybb->user['uid'];
-
             $get_correct = array(
                 'corrector' => $corrector,
             );
-
-
             // Alert auslösen, weil wir wollen ja bescheid wissen, ne?!
             if (class_exists('MybbStuff_MyAlerts_AlertTypeManager')) {
                 $alertType = MybbStuff_MyAlerts_AlertTypeManager::getInstance()->getByCode('alert_getcorrect');
@@ -708,12 +688,9 @@ function application_misc()
                     MybbStuff_MyAlerts_AlertManager::getInstance()->addAlert($alert);
                 }
             }
-
             $db->update_query("applications", $get_correct, "uid = {$correct}");
             redirect("misc.php?action=application_overview");
-
         }
-
         eval ("\$page = \"" . $templates->get("application_misc") . "\";");
         output_page($page);
     }
@@ -979,7 +956,8 @@ function application_alerts()
          * @return void
          */
         public function init()
-        {}
+        {
+        }
 
         /**
          * Format an alert into it's output string to be used in both the main alerts listing page and the popup.
@@ -1017,7 +995,8 @@ function application_alerts()
          * @return void
          */
         public function init()
-        {}
+        {
+        }
 
         /**
          * Format an alert into it's output string to be used in both the main alerts listing page and the popup.
@@ -1056,7 +1035,8 @@ function application_alerts()
          * @return void
          */
         public function init()
-        {}
+        {
+        }
 
         /**
          * Format an alert into it's output string to be used in both the main alerts listing page and the popup.
@@ -1066,7 +1046,7 @@ function application_alerts()
         public function formatAlert(MybbStuff_MyAlerts_Entity_Alert $alert, array $outputAlert): string
         {
             $extraDetails = $alert->getExtraDetails();
-            if(array_key_exists("application_username", $extraDetails)) {
+            if (array_key_exists("application_username", $extraDetails)) {
                 $applicant_username = $extraDetails["application_username"];
                 return "Die Bewerbungsfrist für $applicant_username ist abgelaufen.";
             }
@@ -1081,7 +1061,7 @@ function application_alerts()
         public function buildShowLink(MybbStuff_MyAlerts_Entity_Alert $alert): string
         {
             $extraDetails = $alert->getExtraDetails();
-            if(array_key_exists("application_uid", $extraDetails)) {
+            if (array_key_exists("application_uid", $extraDetails)) {
                 $applicant_uid = $extraDetails["application_uid"];
                 return get_profile_link($applicant_uid);
             }

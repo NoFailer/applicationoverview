@@ -30,7 +30,7 @@ $l['app_showthread'] = "Steckbrief annehmen";
 $l['app_chosegroup'] = "Neue Gruppe wählen";
 $l['app_additionalgroup'] = "Sekundäregruppe wählen";
 $l['app_wobuser'] = "Charakter annehmen";
-$l['app_showthread_correct'] = "Steckbrief wird aktuell korrigiert von: {1}";
+$l['app_showthread_correct'] = "Die Bewerbung wird korrigiert von: {1}";
 $l['app_showthread_correct_no'] = "Niemanden";
 
 // Profil
