@@ -450,6 +450,10 @@ function application_activate()
     ];
     $db->insert_query('tasks', $task);
 
+    /**
+     * @Adriano: THIS DOES NOT WORK FOR CUSTOM TEMPLATES. VARIABLES NEED TO BE ADDED MANUALLY IF TEMPLATES ARE DIFFERENT
+     * FROM THE DEFAULT.
+     */
     require MYBB_ROOT . "/inc/adminfunctions_templates.php";
     find_replace_templatesets("header", "#" . preg_quote('{$pm_notice}') . "#i", '{$application_alert} {$pm_notice}');
     find_replace_templatesets("header", "#" . preg_quote('	<navigation>
@@ -496,7 +500,7 @@ function application_showthread()
     /**
      * @Adriano: To prevent "variable undefined" errors.
      */
-    $corrector_display_text = "";
+    $corrector_display_text = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no);
     /**
      * @Adriano: Get settings.
      */
@@ -514,20 +518,23 @@ function application_showthread()
          * Adriano: Show who is currently correcting/checking the application.
          */
         $thread_uid = $thread['uid'];
-        $corrector_display_text = $lang->sprintf($lang->app_showthread_correct, $lang->app_showthread_correct_no);
         $corrector_uid = $db->fetch_field($db->simple_select("applications", "corrector", "uid = {$thread_uid}"), "corrector");
-        if ($corrector_uid) {
+        /**
+         * Check the master account for the correct permissions/group if there is one.
+         */
+        $master_account = $mybb->user;
+        if ($mybb->user["as_uid"] > 0) {
+            $master_account = $db->fetch_array($db->simple_select('users', 'usergroup', "uid = {$mybb->user["as_uid"]}"));
+        }
+        if ($corrector_uid > 0) {
             $user_information_query = $db->simple_select("users", "username, usergroup, displaygroup", "uid = $corrector_uid");
             $username = $db->fetch_field($user_information_query, "username");
             $usergroup = $db->fetch_field($user_information_query, "usergroup");
             $displaygroup = $db->fetch_field($user_information_query, "displaygroup");
             $formatted_username = format_name($username, $usergroup, $displaygroup);
             $profile_link = build_profile_link($formatted_username, $corrector_uid);
-            /**
-             * @Adriano: Removed "$lang->app_showthread_correct" because custom template contains a different text.
-             */
             $corrector_display_text = $lang->sprintf($lang->app_showthread_correct, $profile_link);
-        } else if($mybb->usergroup['canmodcp'] == 1) {
+        } else if($master_account['usergroup'] == 4 || $mybb->usergroup['canmodcp'] == 1) {
             $add_correct = "<a href='misc.php?action=application_overview&correct=$thread_uid' title='$lang->app_correct_text'>$lang->app_correct_text</a>";
             $corrector_display_text = "$corrector_display_text $add_correct";
         }
@@ -578,7 +585,6 @@ function application_misc()
 {
     global $mybb, $templates, $lang, $header, $headerinclude, $footer, $db, $add_correct;
     $lang->load('application');
-
     // Einstellungen
     $app_maindays = intval($mybb->settings['app_maindays']);
     $app_renewcount = intval($mybb->settings['app_renewcount']);
@@ -591,9 +597,12 @@ function application_misc()
         $lang->app_overview_text = $lang->sprintf($lang->app_overview_text, $app_renewcount, $app_renewdays);
         $table_prefix = TABLE_PREFIX;
         $get_app = $db->query("SELECT * FROM {$table_prefix}applications a LEFT JOIN {$table_prefix}users u ON (a.uid = u.uid) WHERE u.usergroup = 2 ORDER BY a.appdeadline ASC");
-        $user = $mybb->user;
-        if ($user["as_uid"] > 0) {
-            $user = $db->simple_select('users', '*', "uid = {$user["as_uid"]}");
+        /**
+         * Check the master account for the correct permissions/group if there is one.
+         */
+        $master_account = $mybb->user;
+        if ($mybb->user["as_uid"] > 0) {
+            $master_account = $db->fetch_array($db->simple_select('users', 'usergroup', "uid = {$mybb->user["as_uid"]}"));
         }
         while ($row = $db->fetch_array($get_app)) {
             /**
@@ -605,7 +614,7 @@ function application_misc()
             $extradays = $row['appdays'];
             $extendcount = $row['appcount'];
             $as_uid = $row['as_uid'];
-            $character_name = build_profile_link($row['username'], $row['uid']);
+            $character_name = build_profile_link($row['username'], $uid);
             if ($as_uid == $mybb->user['uid'] or $uid == $mybb->user['uid'] or $as_uid == $mybb->user['as_uid']) {
                 if ($row['appcount'] < $app_renewcount && empty($row['corrector'])) {
                     $character_name .= "<a href='misc.php?action=application_overview&extend={$uid}'>{$lang->app_extend}</a>";
@@ -618,25 +627,17 @@ function application_misc()
                 $extenddays = $row['appdays'] * $faktor;
                 $deadline = $deadline + $extenddays;
             }
-
-
             $dayscount = round(($deadline - TIME_NOW) / $faktor) + 1;
             if ($dayscount > 0) {
                 $dayscount = $dayscount . " Tage";
             } else {
                 $dayscount = $lang->app_nodays;
             }
-
             $deadline = date("d.m.y", $deadline);
-            $get_thread = $db->fetch_array($db->simple_select("threads", "*", "uid = $uid and fid = $appforum"));
+            $get_thread = $db->fetch_array($db->simple_select("threads", "tid", "uid = $uid and fid = $appforum"));
             if (!empty($get_thread)) {
                 $app_thread = "<a href='showthread.php?tid={$get_thread['tid']}'>{$lang->app_thread}</a>";
-                if ($user["as_uid"] > 0) {
-                    $user = $db->simple_select('users', '*', "uid = {$user["as_uid"]}");
-                }
-                if (empty($row['corrector']) && $user['usergroup'] == 4) {
-                    $add_correct = "<a href='misc.php?action=application_overview&correct=$uid' title='$lang->app_correct_text'>$lang->app_addcorrecteur</a>";
-                } else {
+                if ($row['corrector'] > 0) {
                     /**
                      * @Adriano: It makes more sense and is much easier to get the username from the users table.
                      * It is always set and cannot be empty. We cannot trust user data that is optional if we want to
@@ -647,12 +648,14 @@ function application_misc()
                     /**
                      * Fallback because not everyone has set their playername.
                      */
-                    if(!$username) {
+                    if(empty($username)) {
                         $username_query = $db->simple_select("users", "username", "uid = {$row['corrector']}");
                         $username = $db->fetch_field($username_query, "username");
                     }
                     $profile_link = build_profile_link($username, $row['corrector'], "_blank");
                     $add_correct = "<div class='smalltext'>$lang->app_correcteur $profile_link</div>";
+                } else if( $master_account['usergroup'] == 4 || $mybb->usergroup['canmodcp'] == 1) {
+                    $add_correct = "<a href='misc.php?action=application_overview&correct=$uid' title='$lang->app_correct_text'>$lang->app_addcorrecteur</a>";
                 }
             }
             eval ("\$application_bit .= \"" . $templates->get("application_misc_bit") . "\";");
